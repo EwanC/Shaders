@@ -48,7 +48,7 @@ float bokeh(ray r, vec3 p, float size, float blur) {
   return mask;
 }
 
-// Pseduorandom number generator
+// Pseudo-random number generator
 vec4 noise(float t) {
   return fract(sin(t * vec4(123., 1024., 3456., 9564.)) *
                vec4(6547., 345., 8799., 1564.));
@@ -72,11 +72,11 @@ vec3 fallingLeaves(ray r, float t) {
   for (float i = 0.; i < 1.; i += s) {
     float ti = fract(t + i);
 
-    vec4 n = noise(i * 100.);
+    vec4 n = noise(i * 2.);
     float x = mix(-20., 20., n.x);
-    x += sin(t * 20. * n.y); // windsway
+    x += sin(t * 20. * n.y); // wind sway
     float fallSpeed = 100.;
-    float base = -14.; // where dots dissappear
+    float base = -14.; // where dots disappear
     float y = base + (fallSpeed - (ti * fallSpeed));
     float z = 50.;
 
@@ -110,7 +110,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
   // Setup ray from camera to lookat
   vec3 camPos = vec3(0., 0., 0.); // camera position
-  vec3 lookAt = vec3(0., 0., 1.); // camera directed at LookAt
+  vec3 lookAt = vec3(0., 0., 1.); // camera directed at lookAt
 
   ray r = getRay(uv, camPos, lookAt, 2.); // Camera setup
 
