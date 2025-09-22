@@ -91,11 +91,55 @@ vec3 fallingLeaves(ray r, float t) {
 
     // Random autumnal color
     vec3 col = getAutumnColor(n.z);
-    // col *= .5; // tone down
-
     c += mask * fade * col;
   }
 
+  return c;
+}
+
+vec3 trees(ray r, float t) {
+  float s = 1. / 500.;
+  vec3 c = vec3(0.); // color
+  for (float i = 0.; i < 1.; i += s) {
+    vec4 n = noise(i);
+
+    float x = mix(-20., 20., n.x);
+    x += sin(t * 2. * n.y); // wind sway
+
+    float y = mix(-5., 10., n.y);
+    float z = mix(30., 50., n.z);
+    vec3 p = vec3(x, y, z);
+
+    float size = mix(.01, .03, n.w);
+    float mask = bokeh(r, p, size, .5);
+    vec3 col = vec3(.2, .9, .5);
+
+    float fade = mix(0.5, 0.3, n.w);
+
+    c += mask * col * fade;
+  }
+  return c;
+}
+
+vec3 forestFloor(ray r, float t) {
+  float s = 1. / 500.;
+  vec3 c = vec3(0.); // color
+  for (float i = 0.; i < 1.; i += s) {
+    vec4 n = noise(i);
+
+    float x = mix(-20., 20., n.x);
+    float y = mix(-15., -5., n.y);
+    float z = mix(30., 50., n.z);
+    vec3 p = vec3(x, y, z);
+
+    float size = mix(.01, .03, n.w);
+    float mask = bokeh(r, p, size, .5);
+    vec3 col = vec3(0.423, 0.2863, 0.227);
+
+    float fade = mix(0.5, 0.3, n.w);
+
+    c += mask * col * fade;
+  }
   return c;
 }
 
@@ -114,14 +158,14 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
   ray r = getRay(uv, camPos, lookAt, 2.); // Camera setup
 
-  vec3 col = vec3(0.);
-  // col += trees
-  // col += forestFloor;
+  // Base background goes top to bottom: blue -> green -> brown.
+  vec3 col = mix(vec3(0.10, 0.20, 0.05), vec3(0.52, 0.80, 0.92), uv.y);
+  col += smoothstep(0.1, -0.5, uv.y) * vec3(0.423, 0.2863, 0.227);
 
+  // Bokeh effects
+  col += trees(r, t);
   col += fallingLeaves(r, t);
-
-  // Add some green for the sky
-  //   col += (r.d.y + .25) * vec3(.2, .9, .5);
+  col += forestFloor(r, t);
 
   fragColor = vec4(col, 1);
 }
