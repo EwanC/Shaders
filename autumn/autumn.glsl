@@ -55,14 +55,16 @@ vec4 noise(float t) {
 }
 
 vec3 getAutumnColor(float t) {
-  vec3 Colors[5] = vec3[](RGB(96., 60., 20.),   // brown
+  const int N = 6;
+  vec3 Colors[N] = vec3[](RGB(96., 60., 20.),   // brown
                           RGB(156., 39., 6.),   // red
                           RGB(212., 91., 18.),  // orange
                           RGB(243., 188., 46.), // yellow
-                          RGB(95., 34., 38.)    // brown
+                          RGB(95., 34., 38.),   // brown
+                          vec3(.2, .9, .5)      // green
   );
 
-  int idx = int(t * 10.) % 5;
+  int idx = int(t * 10.) % N;
   return Colors[idx];
 }
 
@@ -79,7 +81,6 @@ vec3 fallingLeaves(ray r, float t) {
     float base = -14.; // where dots disappear
     float y = base + (fallSpeed - (ti * fallSpeed));
     float z = 50.;
-
     vec3 p = vec3(x, y, z);
 
     float size = mix(.01, .03, n.w);
@@ -89,7 +90,6 @@ vec3 fallingLeaves(ray r, float t) {
     // further multiplication gives a curve of fade
     float fade = ti * ti * ti;
 
-    // Random autumnal color
     vec3 col = getAutumnColor(n.z);
     c += mask * fade * col;
   }
@@ -97,7 +97,7 @@ vec3 fallingLeaves(ray r, float t) {
   return c;
 }
 
-vec3 trees(ray r, float t) {
+vec3 foliage(ray r, float t) {
   float s = 1. / 500.;
   vec3 c = vec3(0.); // color
   for (float i = 0.; i < 1.; i += s) {
@@ -112,10 +112,9 @@ vec3 trees(ray r, float t) {
 
     float size = mix(.01, .03, n.w);
     float mask = bokeh(r, p, size, .5);
-    vec3 col = vec3(.2, .9, .5);
 
+    vec3 col = getAutumnColor(n.z);
     float fade = mix(0.5, 0.3, n.w);
-
     c += mask * col * fade;
   }
   return c;
@@ -129,15 +128,17 @@ vec3 forestFloor(ray r, float t) {
 
     float x = mix(-20., 20., n.x);
     float y = mix(-15., -5., n.y);
-    float z = mix(30., 50., n.z);
+
+    // attenuate time to slow down walking effect
+    float ti = fract(t * 0.5 + i);
+    float z = 50. - (ti * 50.);
     vec3 p = vec3(x, y, z);
 
     float size = mix(.01, .03, n.w);
     float mask = bokeh(r, p, size, .5);
-    vec3 col = vec3(0.423, 0.2863, 0.227);
 
+    vec3 col = vec3(0.423, 0.2863, 0.227); // brown color
     float fade = mix(0.5, 0.3, n.w);
-
     c += mask * col * fade;
   }
   return c;
@@ -163,7 +164,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
   col += smoothstep(0.1, -0.5, uv.y) * vec3(0.423, 0.2863, 0.227);
 
   // Bokeh effects
-  col += trees(r, t);
+  col += foliage(r, t);
   col += fallingLeaves(r, t);
   col += forestFloor(r, t);
 
