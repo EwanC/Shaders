@@ -1,12 +1,11 @@
 /*
-      MIT License
-      Copyright 2025 Ewan Crawford
+   MIT License
+   Copyright 2025 Ewan Crawford
 
-      3D raymarching shader of Pacman.
-      Based on the
-      [RayMarching: Basic
-   Operators](https://www.youtube.com/watch?v=AfKGMUDWfuE) tutorial -
-   https://www.shadertoy.com/view/3ssGWj
+   3D raymarching shader of Pacman.
+   Based on the
+   [RayMarching: Basic Operators](https://www.youtube.com/watch?v=AfKGMUDWfuE)
+   tutorial - https://www.shadertoy.com/view/3ssGWj
 */
 
 #define MAX_STEPS 100
@@ -14,6 +13,12 @@
 #define SURFACE_DIST .01
 #define TAU 6.283185
 #define PI 3.141592
+#define SS(a, b, t) smoothstep(a, b, t)
+
+struct Surface {
+  float d;  // signed distance value
+  vec3 col; // color
+};
 
 mat2 rotate(float a) {
   float s = sin(a);
@@ -21,58 +26,71 @@ mat2 rotate(float a) {
   return mat2(c, -s, s, c);
 }
 
-float sdSphere(vec3 p, float r) { return length(p) - r; }
-
-// https://iquilezles.org/articles/distfunctions/
-float sdTriPrism(vec3 p, vec2 h) {
-  vec3 q = abs(p);
-  return max(q.z - h.y, max(q.x * 0.866025 + p.y * 0.5, -p.y) - h.x * 0.5);
+Surface sdSphere(vec3 p, float r) {
+  float d = length(p) - r;
+  return Surface(d, vec3(.99, .99, .01));
 }
 
-float getDist(vec3 p) {
-  // define a sphere, first .xyz is position, .z is radius
+// https://iquilezles.org/articles/distfunctions/
+Surface sdTriPrism(vec3 p, vec2 h) {
+  vec3 q = abs(p);
+  float d = max(q.z - h.y, max(q.x * 0.866025 + p.y * 0.5, -p.y) - h.x * 0.5);
+  return Surface(d, vec3(.5, .5, .5));
+}
 
-  vec3 sp = p - vec3(0, 1, 0); // touching the ground
-  float sphereDist = sdSphere(sp, 1.);
-  float planeDist = p.y; // plane is ground plane
+Surface minWithColor(Surface obj1, Surface obj2) {
+  if (obj2.d < obj1.d)
+    return obj2; // The sd component of the struct holds the "signed distance"
+                 // value
+  return obj1;
+}
+
+Surface getDist(vec3 p) {
+
+  vec3 sp = p - vec3(0, 1, 0); // sphere touching the ground
+  Surface sphereDist = sdSphere(sp, 1.);
+  Surface planeDist = Surface(p.y, vec3(1, 1, 1)); // plane is ground plane
 
   vec3 pp = p - vec3(0, 1, -1);
   pp.xz *= rotate(30.);
   pp.xy *= rotate(18.);
 
-  float prismDist = sdTriPrism(pp, vec2(1, 1.5));
+  Surface prismDist = sdTriPrism(pp, vec2(1, 1.5));
 
-  float d = min(sphereDist, planeDist);
-  d = max(-prismDist, d);
+  Surface d = minWithColor(sphereDist, planeDist);
+  d = minWithColor(prismDist, d);
   return d;
 }
 
-float rayMarch(vec3 ro, vec3 rd) {
+Surface rayMarch(vec3 ro, vec3 rd) {
   float dO = 0.; // distance from origin
+  Surface co;    // closes object
 
   // marching loop
   for (int i = 0; i < MAX_STEPS; i++) {
     vec3 p = ro + dO * rd; // point at each step of march
-    float dS = getDist(p); // distance to scene
-    dO += dS;              // Move towards scene
-    if (dS < SURFACE_DIST /* hit */ || dO > MAX_DIST /* nothing to hit */) {
+    co = getDist(p);       // distance to scene
+    dO += co.d;            // Move towards scene
+    if (co.d < SURFACE_DIST /* hit */ || dO > MAX_DIST /* nothing to hit */) {
       break;
     }
   }
 
-  return dO;
+  co.d = dO;
+
+  return co;
 }
 
 vec3 getNormal(vec3 p) {
-  float d = getDist(p);
+  float d = getDist(p).d;
 
   vec2 e = vec2(.01, .0); // use for swizzle
 
   // Calculate normal as a line between two very close points.
   // Calculate distance to sightly offset point to 'p'.
-  float x = getDist(p - e.xyy);
-  float y = getDist(p - e.yxy);
-  float z = getDist(p - e.yyx);
+  float x = getDist(p - e.xyy).d;
+  float y = getDist(p - e.yxy).d;
+  float z = getDist(p - e.yyx).d;
   vec3 n = d - vec3(x, y, z);
   return normalize(n);
 }
@@ -99,7 +117,7 @@ float getLight(vec3 p) {
 
   // Avoid exiting ray marching loop early by being too close to plane
   vec3 pAdjusted = p + n * SURFACE_DIST * 2.;
-  float d = rayMarch(pAdjusted, l);
+  float d = rayMarch(pAdjusted, l).d;
   if (d < length(lightPos - p))
     diff *= .1;
 
@@ -128,11 +146,11 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
   vec3 rd = rayDir(uv, ro, vec3(0, 1, 0), 2.); // ray direction
 
-  float d = rayMarch(ro, rd); // distance from ray to object
-  vec3 p = ro + rd * d;       // point of intersection with object.
+  Surface s = rayMarch(ro, rd); // distance from ray to object
+  vec3 p = ro + rd * s.d;       // point of intersection with object.
 
   float diff = getLight(p); // diffuse light
-  vec3 col = vec3(diff);
+  vec3 col = vec3(diff) * s.col;
 
   fragColor = vec4(col, 1.0);
 }
