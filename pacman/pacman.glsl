@@ -16,6 +16,7 @@
 #define YELLOW vec3(.99, .99, .01)
 #define BLUE vec3(25. / 255., 25. / 255., 166. / 255.)
 #define BLUE2 vec3(33. / 255., 33. / 255., 222. / 255.)
+#define TUMBLEWEED vec3(222. / 255., 161. / 255., 133. / 255.)
 
 struct Surface {
   float d;  // signed distance value
@@ -80,6 +81,7 @@ Surface subtractionWithColor(Surface obj1, Surface obj2) {
 }
 
 Surface getDist(vec3 p) {
+  // maze
   Surface groundDist = Surface(p.y, BLUE); // ground plane
   Surface rightWallDist = sdPlane(p, vec3(0., 0, 1.), 2., BLUE2);
   Surface leftWallDist = sdPlane(p, vec3(0., 0, -1.), 2., BLUE2);
@@ -87,7 +89,7 @@ Surface getDist(vec3 p) {
   vec3 sc = p - vec3(0, 1, 0); // sphere center
 
   // mouth animation, done my rotation the two hemispheres making up the body
-  float mouthSpeed = iTime * 2.;
+  float mouthSpeed = iTime * 3.;
   float mouthAngle = PI / 5.; // Controls max angle mouth opens to
   float mouthRotation = abs(sin(mouthSpeed) * mouthAngle);
 
@@ -111,11 +113,17 @@ Surface getDist(vec3 p) {
   vec3 e2p = p - vec3(-.4, 1.8, -.4);
   Surface eye2Dist = sdSphere(e2p, .1, YELLOW);
 
+  // Scran
+  float scranX = -(1. - fract(iTime)) * 4.;
+  vec3 sp = p - vec3(scranX, 1, 0);
+  Surface scranDist = sdSphere(sp, .2, TUMBLEWEED);
+
   // Compose distances
   Surface d = unionWithColor(bottomDist, groundDist);
   d = unionWithColor(rightWallDist, d);
   d = unionWithColor(leftWallDist, d);
   d = unionWithColor(topDist, d);
+  d = unionWithColor(scranDist, d);
   d = subtractionWithColor(eye1Dist, d);
   d = subtractionWithColor(eye2Dist, d);
 
