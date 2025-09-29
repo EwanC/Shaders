@@ -13,8 +13,9 @@
 #define SURFACE_DIST .01
 #define TAU 6.283185
 #define PI 3.141592
-#define SS(a, b, t) smoothstep(a, b, t)
 #define YELLOW vec3(.99, .99, .01)
+#define BLUE vec3(25. / 255., 25. / 255., 166. / 255.)
+#define BLUE2 vec3(33. / 255., 33. / 255., 222. / 255.)
 
 struct Surface {
   float d;  // signed distance value
@@ -27,8 +28,13 @@ mat2 rotate(float a) {
   return mat2(c, -s, s, c);
 }
 
+Surface onion(Surface obj, float thickness) {
+  float d = abs(obj.d) - thickness;
+  return Surface(d, obj.col);
+}
+
 // https://iquilezles.org/articles/distfunctions/
-Surface sdCutSphere(vec3 p, float r, float h) {
+Surface sdCutSphere(vec3 p, float r, float h, vec3 col) {
   float w = sqrt(r * r - h * h);
 
   vec2 q = vec2(length(p.xz), p.y);
@@ -37,13 +43,19 @@ Surface sdCutSphere(vec3 p, float r, float h) {
   float d = (s < 0.0)   ? length(q) - r
             : (q.x < w) ? h - q.y
                         : length(q - vec2(w, h));
-  return Surface(d, YELLOW);
+  return Surface(d, col);
 }
 
 // https://iquilezles.org/articles/distfunctions/
-Surface sdSphere(vec3 p, float s) {
+Surface sdSphere(vec3 p, float s, vec3 col) {
   float d = length(p) - s;
-  return Surface(d, YELLOW);
+  return Surface(d, col);
+}
+
+Surface sdPlane(vec3 p, vec3 n, float h, vec3 col) {
+  // n must be normalized
+  float d = dot(p, n) + h;
+  return Surface(d, col);
 }
 
 Surface unionWithColor(Surface obj1, Surface obj2) {
@@ -68,7 +80,9 @@ Surface subtractionWithColor(Surface obj1, Surface obj2) {
 }
 
 Surface getDist(vec3 p) {
-  Surface planeDist = Surface(p.y, vec3(1, 1, 1)); // ground plane
+  Surface groundDist = Surface(p.y, BLUE); // ground plane
+  Surface rightWallDist = sdPlane(p, vec3(0., 0, 1.), 2., BLUE2);
+  Surface leftWallDist = sdPlane(p, vec3(0., 0, -1.), 2., BLUE2);
 
   vec3 sc = p - vec3(0, 1, 0); // sphere center
 
@@ -80,23 +94,27 @@ Surface getDist(vec3 p) {
   // body top hemisphere
   vec3 th = sc;
   th.xy *= rotate(mouthRotation);
-  Surface topDist = sdCutSphere(th, 1., 0.);
+  Surface topDist = sdCutSphere(th, 1., 0., YELLOW);
+  topDist = onion(topDist, .03);
 
   // body bottom hemisphere
   vec3 bh = sc;
   bh.xy *= rotate(PI); // flip 180 degrees to make bottom hemisphere
   bh.xy *= rotate(-mouthRotation);
-  Surface bottomDist = sdCutSphere(bh, 1., 0.);
+  Surface bottomDist = sdCutSphere(bh, 1., 0., YELLOW);
+  bottomDist = onion(bottomDist, .03);
 
   // Eyes
   vec3 e1p = p - vec3(-.4, 1.8, .4);
-  Surface eye1Dist = sdSphere(e1p, .1);
+  Surface eye1Dist = sdSphere(e1p, .1, YELLOW);
 
   vec3 e2p = p - vec3(-.4, 1.8, -.4);
-  Surface eye2Dist = sdSphere(e2p, .1);
+  Surface eye2Dist = sdSphere(e2p, .1, YELLOW);
 
   // Compose distances
-  Surface d = unionWithColor(bottomDist, planeDist);
+  Surface d = unionWithColor(bottomDist, groundDist);
+  d = unionWithColor(rightWallDist, d);
+  d = unionWithColor(leftWallDist, d);
   d = unionWithColor(topDist, d);
   d = subtractionWithColor(eye1Dist, d);
   d = subtractionWithColor(eye2Dist, d);
@@ -138,7 +156,7 @@ vec3 getNormal(vec3 p) {
 }
 
 float getLight(vec3 p) {
-  vec3 lightPos = vec3(-3, 5, 4); // Light source point
+  vec3 lightPos = vec3(-2, 8, 0); // Light source point
 
   // Move light around scene in a circle
   // lightPos.xz += vec2(sin(iTime), cos(iTime)) * 2.; // multiple to speedup
