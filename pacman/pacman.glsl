@@ -14,6 +14,7 @@
 #define TAU 6.283185
 #define PI 3.141592
 #define SS(a, b, t) smoothstep(a, b, t)
+#define YELLOW vec3(.99, .99, .01)
 
 struct Surface {
   float d;  // signed distance value
@@ -26,39 +27,76 @@ mat2 rotate(float a) {
   return mat2(c, -s, s, c);
 }
 
-Surface sdSphere(vec3 p, float r) {
-  float d = length(p) - r;
-  return Surface(d, vec3(.99, .99, .01));
+// https://iquilezles.org/articles/distfunctions/
+Surface sdCapsule(vec3 p, vec3 a, vec3 b, float r) {
+  vec3 pa = p - a, ba = b - a;
+  float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+  float d = length(pa - ba * h) - r;
+  return Surface(d, YELLOW);
 }
 
 // https://iquilezles.org/articles/distfunctions/
-Surface sdTriPrism(vec3 p, vec2 h) {
-  vec3 q = abs(p);
-  float d = max(q.z - h.y, max(q.x * 0.866025 + p.y * 0.5, -p.y) - h.x * 0.5);
-  return Surface(d, vec3(.5, .5, .5));
+Surface sdCutSphere(vec3 p, float r, float h) {
+  float w = sqrt(r * r - h * h);
+
+  vec2 q = vec2(length(p.xz), p.y);
+  float s =
+      max((h - r) * q.x * q.x + w * w * (h + r - 2.0 * q.y), h * q.x - w * q.y);
+  float d = (s < 0.0)   ? length(q) - r
+            : (q.x < w) ? h - q.y
+                        : length(q - vec2(w, h));
+  return Surface(d, YELLOW);
 }
 
-Surface minWithColor(Surface obj1, Surface obj2) {
+Surface unionWithColor(Surface obj1, Surface obj2) {
   if (obj2.d < obj1.d)
-    return obj2; // The sd component of the struct holds the "signed distance"
-                 // value
+    return obj2;
+  return obj1;
+}
+
+Surface intersectionWithColor(Surface obj1, Surface obj2) {
+  if (obj2.d > obj1.d)
+    return obj2;
+  return obj1;
+}
+
+Surface subtractionWithColor(Surface obj1, Surface obj2) {
+  if (obj2.d > -obj1.d) {
+    return obj2;
+  }
+  obj1.d = -obj1.d;
   return obj1;
 }
 
 Surface getDist(vec3 p) {
+  Surface planeDist = Surface(p.y, vec3(1, 1, 1)); // ground plane
 
-  vec3 sp = p - vec3(0, 1, 0); // sphere touching the ground
-  Surface sphereDist = sdSphere(sp, 1.);
-  Surface planeDist = Surface(p.y, vec3(1, 1, 1)); // plane is ground plane
+  vec3 sc = p - vec3(0, 1, 0); // sphere center
 
-  vec3 pp = p - vec3(0, 1, -1);
-  pp.xz *= rotate(30.);
-  pp.xy *= rotate(18.);
+  // mouth animation, done my rotation the two hemispheres making up the body
+  float mouthSpeed = iTime * 2.;
+  float mouthAngle = PI / 4.; // Controls max angle mouth opens to
+  float mouthRotation = abs(sin(mouthSpeed) * mouthAngle);
 
-  Surface prismDist = sdTriPrism(pp, vec2(1, 1.5));
+  // body top hemisphere
+  vec3 th = sc;
+  th.xy *= rotate(mouthRotation);
+  Surface topDist = sdCutSphere(th, 1., 0.);
 
-  Surface d = minWithColor(sphereDist, planeDist);
-  d = minWithColor(prismDist, d);
+  // body bottom hemisphere
+  vec3 bh = sc;
+  bh.xy *= rotate(PI); // flip 180 degrees to make bottom hemisphere
+  bh.xy *= rotate(-mouthRotation);
+  Surface bottomDist = sdCutSphere(bh, 1., 0.);
+
+  // Eyes
+  vec3 cp = p - vec3(0, 1.6, 0);
+  Surface capsuleDist = sdCapsule(cp, vec3(1., 0, 0), vec3(-1., 0, 0), .15);
+
+  // Compose distances
+  Surface d = unionWithColor(bottomDist, planeDist);
+  d = unionWithColor(topDist, d);
+  d = subtractionWithColor(capsuleDist, d);
   return d;
 }
 
