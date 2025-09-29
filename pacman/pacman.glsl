@@ -28,14 +28,6 @@ mat2 rotate(float a) {
 }
 
 // https://iquilezles.org/articles/distfunctions/
-Surface sdCapsule(vec3 p, vec3 a, vec3 b, float r) {
-  vec3 pa = p - a, ba = b - a;
-  float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
-  float d = length(pa - ba * h) - r;
-  return Surface(d, YELLOW);
-}
-
-// https://iquilezles.org/articles/distfunctions/
 Surface sdCutSphere(vec3 p, float r, float h) {
   float w = sqrt(r * r - h * h);
 
@@ -45,6 +37,12 @@ Surface sdCutSphere(vec3 p, float r, float h) {
   float d = (s < 0.0)   ? length(q) - r
             : (q.x < w) ? h - q.y
                         : length(q - vec2(w, h));
+  return Surface(d, YELLOW);
+}
+
+// https://iquilezles.org/articles/distfunctions/
+Surface sdSphere(vec3 p, float s) {
+  float d = length(p) - s;
   return Surface(d, YELLOW);
 }
 
@@ -60,6 +58,7 @@ Surface intersectionWithColor(Surface obj1, Surface obj2) {
   return obj1;
 }
 
+// Subtracts obj1 from obj2
 Surface subtractionWithColor(Surface obj1, Surface obj2) {
   if (obj2.d > -obj1.d) {
     return obj2;
@@ -75,7 +74,7 @@ Surface getDist(vec3 p) {
 
   // mouth animation, done my rotation the two hemispheres making up the body
   float mouthSpeed = iTime * 2.;
-  float mouthAngle = PI / 4.; // Controls max angle mouth opens to
+  float mouthAngle = PI / 5.; // Controls max angle mouth opens to
   float mouthRotation = abs(sin(mouthSpeed) * mouthAngle);
 
   // body top hemisphere
@@ -90,13 +89,18 @@ Surface getDist(vec3 p) {
   Surface bottomDist = sdCutSphere(bh, 1., 0.);
 
   // Eyes
-  vec3 cp = p - vec3(0, 1.6, 0);
-  Surface capsuleDist = sdCapsule(cp, vec3(1., 0, 0), vec3(-1., 0, 0), .15);
+  vec3 e1p = p - vec3(-.4, 1.8, .4);
+  Surface eye1Dist = sdSphere(e1p, .1);
+
+  vec3 e2p = p - vec3(-.4, 1.8, -.4);
+  Surface eye2Dist = sdSphere(e2p, .1);
 
   // Compose distances
   Surface d = unionWithColor(bottomDist, planeDist);
   d = unionWithColor(topDist, d);
-  d = subtractionWithColor(capsuleDist, d);
+  d = subtractionWithColor(eye1Dist, d);
+  d = subtractionWithColor(eye2Dist, d);
+
   return d;
 }
 
@@ -134,7 +138,7 @@ vec3 getNormal(vec3 p) {
 }
 
 float getLight(vec3 p) {
-  vec3 lightPos = vec3(3, 5, -4); // Light source point
+  vec3 lightPos = vec3(-3, 5, 4); // Light source point
 
   // Move light around scene in a circle
   // lightPos.xz += vec2(sin(iTime), cos(iTime)) * 2.; // multiple to speedup
