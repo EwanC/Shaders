@@ -18,6 +18,7 @@
 #define BLUE2 vec3(33. / 255., 33. / 255., 222. / 255.)
 #define TUMBLEWEED vec3(222. / 255., 161. / 255., 133. / 255.)
 
+// https://inspirnathan.com/posts/53-shadertoy-tutorial-part-7#adding-unique-colors-method-2
 struct Surface {
   float d;  // signed distance value
   vec3 col; // color
@@ -29,12 +30,13 @@ mat2 rotate(float a) {
   return mat2(c, -s, s, c);
 }
 
+// https://iquilezles.org/articles/distfunctions
 Surface onion(Surface obj, float thickness) {
   float d = abs(obj.d) - thickness;
   return Surface(d, obj.col);
 }
 
-// https://iquilezles.org/articles/distfunctions/
+// https://iquilezles.org/articles/distfunctions
 Surface sdCutSphere(vec3 p, float r, float h, vec3 col) {
   float w = sqrt(r * r - h * h);
 
@@ -47,12 +49,13 @@ Surface sdCutSphere(vec3 p, float r, float h, vec3 col) {
   return Surface(d, col);
 }
 
-// https://iquilezles.org/articles/distfunctions/
+// https://iquilezles.org/articles/distfunctions
 Surface sdSphere(vec3 p, float s, vec3 col) {
   float d = length(p) - s;
   return Surface(d, col);
 }
 
+// https://iquilezles.org/articles/distfunctions
 Surface sdPlane(vec3 p, vec3 n, float h, vec3 col) {
   // n must be normalized
   float d = dot(p, n) + h;
@@ -89,7 +92,7 @@ Surface getDist(vec3 p) {
   vec3 sc = p - vec3(0, 1, 0); // sphere center
 
   // mouth animation, done my rotation the two hemispheres making up the body
-  float mouthSpeed = iTime * 3.;
+  float mouthSpeed = iTime * 6.;
   float mouthAngle = PI / 5.; // Controls max angle mouth opens to
   float mouthRotation = abs(sin(mouthSpeed) * mouthAngle);
 
@@ -113,17 +116,17 @@ Surface getDist(vec3 p) {
   vec3 e2p = p - vec3(-.4, 1.8, -.4);
   Surface eye2Dist = sdSphere(e2p, .1, YELLOW);
 
-  // Scran
-  float scranX = -(1. - fract(iTime)) * 4.;
-  vec3 sp = p - vec3(scranX, 1, 0);
-  Surface scranDist = sdSphere(sp, .2, TUMBLEWEED);
+  // Pellet
+  float pelletX = -(1. - fract(iTime)) * 4.; // move away from camera
+  vec3 pp = p - vec3(pelletX, 1, 0);
+  Surface pelletDist = sdSphere(pp, .2, TUMBLEWEED);
 
   // Compose distances
   Surface d = unionWithColor(bottomDist, groundDist);
   d = unionWithColor(rightWallDist, d);
   d = unionWithColor(leftWallDist, d);
   d = unionWithColor(topDist, d);
-  d = unionWithColor(scranDist, d);
+  d = unionWithColor(pelletDist, d);
   d = subtractionWithColor(eye1Dist, d);
   d = subtractionWithColor(eye2Dist, d);
 
@@ -205,13 +208,9 @@ vec3 rayDir(vec2 uv, vec3 p, vec3 l, float z) {
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
   // normalize to <-0.5, 0.5>
   vec2 uv = (fragCoord - .5 * iResolution.xy) / iResolution.y;
-  vec2 m = iMouse.xy / iResolution.xy;
 
   // Camera
-  vec3 ro = vec3(0., 4., -5.); // ray origin
-  ro.yz *= rotate(-m.y * PI + 1.);
-  ro.xz *= rotate(-m.x * TAU);
-
+  vec3 ro = vec3(-6., 3., 1); // ray origin
   vec3 rd = rayDir(uv, ro, vec3(0, 1, 0), 2.); // ray direction
 
   Surface s = rayMarch(ro, rd); // distance from ray to object
